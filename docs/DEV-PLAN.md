@@ -51,6 +51,8 @@ Status: complete
 
 ## Phase 5: Playback
 
+Status: complete
+
 - Validate episode numbers.
 - Add `GET /api/anime/:id/episode/:episode`.
 - Resolve the episode through `ani-cli`.

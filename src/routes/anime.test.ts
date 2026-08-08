@@ -50,3 +50,57 @@ test("anime route hides provider failures", async () => {
   assert.deepEqual(response.json(), { error: "Could not load episodes." });
   await app.close();
 });
+
+test("episode route returns a resolved stream", async () => {
+  const resolution = {
+    title: "One Piece",
+    episode: 1,
+    streamUrl: "https://example.test/episode.m3u8"
+  };
+  const app = await createServer({
+    resolveEpisode: async () => resolution
+  } as unknown as AniCliService);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/anime/selection/episode/1"
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), resolution);
+  await app.close();
+});
+
+test("episode route returns 400 for invalid episode input", async () => {
+  const app = await createServer({
+    resolveEpisode: async () => {
+      throw new AniCliInputError("Episode number is invalid");
+    }
+  } as unknown as AniCliService);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/anime/selection/episode/1"
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), { error: "Invalid episode request." });
+  await app.close();
+});
+
+test("episode route hides stream-resolution failures", async () => {
+  const app = await createServer({
+    resolveEpisode: async () => {
+      throw new Error("provider details");
+    }
+  } as unknown as AniCliService);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/anime/selection/episode/1"
+  });
+
+  assert.equal(response.statusCode, 502);
+  assert.deepEqual(response.json(), { error: "Could not resolve this episode." });
+  await app.close();
+});

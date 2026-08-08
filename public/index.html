@@ -25,6 +25,12 @@
         <h2 id="episodes-heading">Episodes</h2>
         <ul id="episode-results"></ul>
       </section>
+      <section id="player-panel" aria-labelledby="player-heading" hidden>
+        <h2 id="player-heading">Now playing</h2>
+        <p id="player-title"></p>
+        <video id="video-player" controls playsinline preload="metadata"></video>
+        <p id="player-status" role="status" aria-live="polite"></p>
+      </section>
     </main>
     <script type="module" src="/app.js"></script>
   </body>

@@ -76,6 +76,14 @@ button:disabled {
   list-style: none;
 }
 
+#video-player {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 1rem;
+  background: #000;
+}
+
 .result-button {
   width: 100%;
   text-align: left;

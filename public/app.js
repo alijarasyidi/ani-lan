@@ -4,12 +4,61 @@ const status = document.querySelector("#search-status");
 const results = document.querySelector("#search-results");
 const episodesPanel = document.querySelector("#episodes-panel");
 const episodes = document.querySelector("#episode-results");
+const playerPanel = document.querySelector("#player-panel");
+const playerTitle = document.querySelector("#player-title");
+const video = document.querySelector("#video-player");
+const playerStatus = document.querySelector("#player-status");
 const submitButton = form.querySelector("button[type=submit]");
 let episodeRequest = 0;
+let resolutionRequest = 0;
 
 function setStatus(message) {
   status.textContent = message;
 }
+
+function hidePlayer() {
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  playerPanel.hidden = true;
+  playerTitle.textContent = "";
+  playerStatus.textContent = "";
+}
+
+async function resolveEpisode(anime, episode) {
+  const requestNumber = ++resolutionRequest;
+  hidePlayer();
+  setStatus(`Resolving ${anime.title}, episode ${episode}...`);
+  playerStatus.textContent = "Resolving stream...";
+
+  try {
+    const response = await fetch(`/api/anime/${encodeURIComponent(anime.id)}/episode/${episode}`);
+    const body = await response.json();
+
+    if (requestNumber !== resolutionRequest) {
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(body.error ?? "Could not resolve this episode.");
+    }
+
+    playerTitle.textContent = `${body.title} - Episode ${body.episode}`;
+    video.src = body.streamUrl;
+    video.load();
+    playerPanel.hidden = false;
+    playerStatus.textContent = "Stream ready. Press play to watch.";
+    setStatus(playerTitle.textContent);
+  } catch (error) {
+    if (requestNumber === resolutionRequest) {
+      setStatus(error instanceof Error ? error.message : "Could not resolve this episode.");
+      playerStatus.textContent = "Could not load this episode.";
+    }
+  }
+}
+
+video.addEventListener("error", () => {
+  playerStatus.textContent = "This stream cannot be played directly in this browser.";
+});
 
 function renderEpisodes(anime) {
   episodes.replaceChildren();
@@ -20,9 +69,7 @@ function renderEpisodes(anime) {
     button.type = "button";
     button.className = "result-button";
     button.textContent = `Episode ${episode.number}`;
-    button.addEventListener("click", () => {
-      setStatus(`${anime.title}, episode ${episode.number} selected. Playback is next.`);
-    });
+    button.addEventListener("click", () => void resolveEpisode(anime, episode.number));
     listItem.append(button);
     episodes.append(listItem);
   }
@@ -86,6 +133,8 @@ form.addEventListener("submit", async (event) => {
   episodesPanel.hidden = true;
   episodes.replaceChildren();
   episodeRequest += 1;
+  resolutionRequest += 1;
+  hidePlayer();
 
   try {
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
