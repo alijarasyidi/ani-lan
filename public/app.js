@@ -16,11 +16,16 @@ function setStatus(message) {
   status.textContent = message;
 }
 
+function setBusy(element, busy) {
+  element.setAttribute("aria-busy", String(busy));
+}
+
 function hidePlayer() {
   video.pause();
   video.removeAttribute("src");
   video.load();
   playerPanel.hidden = true;
+  setBusy(playerPanel, false);
   playerTitle.textContent = "";
   playerStatus.textContent = "";
 }
@@ -28,6 +33,7 @@ function hidePlayer() {
 async function resolveEpisode(anime, episode) {
   const requestNumber = ++resolutionRequest;
   hidePlayer();
+  setBusy(episodesPanel, true);
   setStatus(`Resolving ${anime.title}, episode ${episode}...`);
   playerStatus.textContent = "Resolving stream...";
 
@@ -46,12 +52,17 @@ async function resolveEpisode(anime, episode) {
     video.src = body.streamUrl;
     video.load();
     playerPanel.hidden = false;
+    setBusy(playerPanel, false);
     playerStatus.textContent = "Stream ready. Press play to watch.";
     setStatus(playerTitle.textContent);
   } catch (error) {
     if (requestNumber === resolutionRequest) {
       setStatus(error instanceof Error ? error.message : "Could not resolve this episode.");
       playerStatus.textContent = "Could not load this episode.";
+    }
+  } finally {
+    if (requestNumber === resolutionRequest) {
+      setBusy(episodesPanel, false);
     }
   }
 }
@@ -79,8 +90,11 @@ function renderEpisodes(anime) {
 
 async function selectAnime(item) {
   const requestNumber = ++episodeRequest;
+  resolutionRequest += 1;
+  hidePlayer();
   episodesPanel.hidden = true;
   episodes.replaceChildren();
+  setBusy(episodesPanel, true);
   setStatus(`Loading episodes for ${item.title}...`);
 
   try {
@@ -100,11 +114,23 @@ async function selectAnime(item) {
     if (requestNumber === episodeRequest) {
       setStatus(error instanceof Error ? error.message : "Could not load episodes.");
     }
+  } finally {
+    if (requestNumber === episodeRequest) {
+      setBusy(episodesPanel, false);
+    }
   }
 }
 
 function renderResults(items) {
   results.replaceChildren();
+
+  if (items.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty-state";
+    empty.textContent = "No anime found.";
+    results.append(empty);
+    return;
+  }
 
   for (const item of items) {
     const listItem = document.createElement("li");
@@ -128,6 +154,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   submitButton.disabled = true;
+  setBusy(form, true);
   setStatus("Searching...");
   results.replaceChildren();
   episodesPanel.hidden = true;
@@ -135,6 +162,7 @@ form.addEventListener("submit", async (event) => {
   episodeRequest += 1;
   resolutionRequest += 1;
   hidePlayer();
+  setBusy(episodesPanel, false);
 
   try {
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -144,11 +172,13 @@ form.addEventListener("submit", async (event) => {
       throw new Error(body.error ?? "Could not search anime.");
     }
 
-    renderResults(body.results);
-    setStatus(`${body.results.length} result${body.results.length === 1 ? "" : "s"} found.`);
+    const foundResults = Array.isArray(body.results) ? body.results : [];
+    renderResults(foundResults);
+    setStatus(`${foundResults.length} result${foundResults.length === 1 ? "" : "s"} found.`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Could not search anime.");
   } finally {
     submitButton.disabled = false;
+    setBusy(form, false);
   }
 });

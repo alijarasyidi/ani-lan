@@ -2,14 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#171717">
     <title>AniLAN</title>
     <link rel="stylesheet" href="/style.css">
   </head>
   <body>
     <main>
       <h1>AniLAN</h1>
-      <form id="search-form">
+      <form id="search-form" aria-busy="false">
         <label for="search-query">Search anime</label>
         <div class="search-row">
           <input id="search-query" name="q" type="search" maxlength="120" placeholder="Search anime..." required>
@@ -19,11 +20,11 @@
       <p id="search-status" role="status" aria-live="polite"></p>
       <section aria-labelledby="results-heading">
         <h2 id="results-heading">Search results</h2>
-        <ul id="search-results"></ul>
+        <ul id="search-results" aria-live="polite"></ul>
       </section>
       <section id="episodes-panel" aria-labelledby="episodes-heading" hidden>
         <h2 id="episodes-heading">Episodes</h2>
-        <ul id="episode-results"></ul>
+        <ul id="episode-results" aria-live="polite"></ul>
       </section>
       <section id="player-panel" aria-labelledby="player-heading" hidden>
         <h2 id="player-heading">Now playing</h2>

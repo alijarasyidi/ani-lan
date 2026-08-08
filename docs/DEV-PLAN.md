@@ -61,6 +61,8 @@ Status: complete
 
 ## Phase 6: Mobile UX
 
+Status: complete
+
 - Keep the UI limited to search, results, episodes, and a video player.
 - Use responsive layout, large tap targets, and `playsinline` video playback.
 - Add loading and human-readable error states.
