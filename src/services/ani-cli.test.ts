@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import {
   decodeSelection,
@@ -42,4 +45,22 @@ test("reports a missing ani-cli executable without throwing raw subprocess error
 
   assert.equal(status.available, false);
   assert.equal(status.error, "Unable to start ani-cli");
+});
+
+test("terminates a timed-out ani-cli subprocess", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-timeout-"));
+  const executable = path.join(directory, "ani-cli-timeout");
+
+  try {
+    await writeFile(executable, "#!/bin/sh\nsleep 2\n", "utf8");
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable, timeoutMs: 20 });
+    const status = await service.checkAvailability();
+
+    assert.equal(status.available, false);
+    assert.equal(status.error, "ani-cli timed out");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

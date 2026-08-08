@@ -260,6 +260,7 @@ export class AniCliService {
     return new Promise((resolve, reject) => {
       const child = spawn(this.binary, args, {
         cwd: projectRoot,
+        detached: true,
         env: environment,
         shell: false,
         stdio: ["ignore", "pipe", "pipe"]
@@ -281,7 +282,7 @@ export class AniCliService {
 
       const timer = setTimeout(() => {
         timedOut = true;
-        child.kill("SIGTERM");
+        terminateProcessGroup(child);
       }, this.timeoutMs);
 
       const collect = (target: string[], chunk: Buffer) => {
@@ -292,7 +293,7 @@ export class AniCliService {
         outputBytes += chunk.byteLength;
         if (outputBytes > this.maxOutputBytes) {
           outputTooLarge = true;
-          child.kill("SIGTERM");
+          terminateProcessGroup(child);
           return;
         }
 
@@ -335,6 +336,19 @@ export class AniCliService {
     );
     return next;
   }
+}
+
+function terminateProcessGroup(child: ReturnType<typeof spawn>): void {
+  if (child.pid && process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+      return;
+    } catch {
+      // Fall back to terminating the direct child if process groups are unavailable.
+    }
+  }
+
+  child.kill("SIGTERM");
 }
 
 function validateQuery(query: string): void {

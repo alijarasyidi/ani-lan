@@ -69,11 +69,13 @@ Status: complete
 
 ## Phase 7: Verification and Documentation
 
-- Test build, development, and production commands inside WSL1.
-- Test the complete search-to-play flow from a phone on the home LAN.
-- Verify invalid input, subprocess failures, timeouts, and missing `ani-cli`.
-- Document setup, configuration, LAN access, firewall requirements, stopping,
-  and known provider/browser limitations.
+Status: in progress
+
+- [x] Test build, development, and production commands inside WSL1.
+- [ ] Test the complete search-to-play flow from a phone on the home LAN.
+- [x] Verify invalid input, subprocess failures, timeouts, and missing `ani-cli`.
+- [x] Document setup, configuration, LAN access, firewall requirements,
+  stopping, and known provider/browser limitations.
 
 ## Explicit Non-Goals
 

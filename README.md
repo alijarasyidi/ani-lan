@@ -142,7 +142,7 @@ The structure may evolve as the project develops, but responsibilities should re
 
 ## 🚀 Getting Started
 
-> This section describes the intended setup. Commands may change as implementation progresses.
+AniLAN is intended to run inside the same WSL1 distribution as `ani-cli`.
 
 ### Prerequisites
 
@@ -153,22 +153,34 @@ You need:
 - npm
 - `ani-cli`
 
-Verify that `ani-cli` is available:
-
-```bash
-ani-cli --version
-```
-
-Verify Node.js:
+Node.js and npm must be the Linux binaries inside WSL. Do not run the app with
+the Windows `node.exe` interop path. Verify the environment:
 
 ```bash
 node --version
 npm --version
+ani-cli -V
 ```
+
+The tested environment uses Node.js 20.19.4 and npm 10.8.2. If Ubuntu's
+packaged Node.js cannot execute in WSL1, install the official Linux tarball:
+
+```bash
+NODE_VERSION=20.19.4
+curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
+sudo mkdir -p /usr/local/lib/nodejs
+sudo tar -xJf "node-v${NODE_VERSION}-linux-x64.tar.xz" -C /usr/local/lib/nodejs
+sudo ln -sfn "/usr/local/lib/nodejs/node-v${NODE_VERSION}-linux-x64/bin/node" /usr/local/bin/node
+sudo ln -sfn "/usr/local/lib/nodejs/node-v${NODE_VERSION}-linux-x64/bin/npm" /usr/local/bin/npm
+sudo ln -sfn "/usr/local/lib/nodejs/node-v${NODE_VERSION}-linux-x64/bin/npx" /usr/local/bin/npx
+```
+
+Confirm that `command -v node` returns `/usr/local/bin/node` or another Linux
+path inside WSL.
 
 ### Install
 
-Clone the repository and install dependencies:
+From the repository directory inside WSL, install dependencies:
 
 ```bash
 npm install
@@ -198,6 +210,8 @@ npm run build
 npm start
 ```
 
+Stop the server with `Ctrl+C`.
+
 ---
 
 ## 📱 Accessing AniLAN from Your Phone
@@ -224,6 +238,21 @@ http://192.168.1.100:3000
 
 If the application cannot be reached from another device, check the host's firewall/network configuration.
 
+WSL1 shares the Windows host network stack. Find the Windows LAN address with
+`ipconfig` in PowerShell or `hostname -I` in WSL. Windows Firewall may require
+an inbound rule for the selected port. For the default private-LAN setup, run
+PowerShell as Administrator:
+
+```powershell
+New-NetFirewallRule -DisplayName "AniLAN 3000" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private
+```
+
+Remove the rule when it is no longer needed:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "AniLAN 3000"
+```
+
 AniLAN should **not** be exposed directly to the public internet.
 
 ---
@@ -238,6 +267,8 @@ Example:
 HOST=0.0.0.0
 PORT=3000
 ANICLI_BIN=ani-cli
+ANICLI_TIMEOUT_MS=60000
+ANICLI_MAX_OUTPUT_BYTES=1048576
 ```
 
 ### `HOST`
@@ -269,6 +300,15 @@ Default:
 ```text
 ani-cli
 ```
+
+### `ANICLI_TIMEOUT_MS`
+
+Maximum time allowed for one `ani-cli` subprocess. Default: `60000`.
+
+### `ANICLI_MAX_OUTPUT_BYTES`
+
+Maximum combined stdout/stderr captured from one subprocess. Default:
+`1048576`.
 
 ---
 
@@ -329,6 +369,11 @@ Phone Browser
 This avoids unnecessarily routing the entire video through AniLAN.
 
 If a provider requires additional handling — such as specific headers, CORS workarounds, or browser-incompatible streams — a backend streaming proxy may be introduced later.
+
+The v0 implementation does not add an HLS library or streaming proxy. Safari
+and iOS browsers commonly support HLS directly; some Android browsers may not.
+If the target phone cannot play the returned `.m3u8` URL, browser testing must
+determine whether a client-side HLS library or a backend proxy is necessary.
 
 ---
 
@@ -435,17 +480,17 @@ without redesigning the entire application.
 
 ### v0 — Basic Viewer
 
-- [ ] Node.js + TypeScript project
-- [ ] Fastify server
-- [ ] LAN-accessible web interface
-- [ ] `ani-cli` integration
-- [ ] Anime search
-- [ ] Anime selection
-- [ ] Episode selection
-- [ ] Stream resolution
-- [ ] HTML5 video player
-- [ ] Mobile-responsive layout
-- [ ] Basic error handling
+- [x] Node.js + TypeScript project
+- [x] Fastify server
+- [x] LAN-accessible web interface
+- [x] `ani-cli` integration
+- [x] Anime search
+- [x] Anime selection
+- [x] Episode selection
+- [x] Stream resolution
+- [x] HTML5 video player
+- [x] Mobile-responsive layout
+- [x] Basic error handling
 
 ### Future
 
@@ -463,6 +508,33 @@ Potential future features may include:
 - Optional authentication
 
 These features are intentionally deferred until the core experience is stable.
+
+### Troubleshooting
+
+If AniLAN reports that `ani-cli` is unavailable, run `command -v ani-cli` and
+`ani-cli -V` inside the same WSL distribution used to start AniLAN. Set
+`ANICLI_BIN` only when the executable is not on `$PATH`.
+
+If search fails with a Cloudflare challenge, update or install the curl
+impersonation tool recommended by `ani-cli`. This is an upstream provider
+access issue, not a local AniLAN API issue.
+
+If a search result has no usable title, AniLAN does not invent metadata and may
+reject that provider response. Search data comes from the installed
+`ani-cli` version and its upstream source.
+
+If the page opens on the phone but video playback fails, test the returned
+stream in the phone browser. HLS support differs between browsers. AniLAN v0
+does not proxy or transcode streams.
+
+For a local verification without a phone:
+
+```bash
+npm run build
+npm test
+node --check public/app.js
+npm start
+```
 
 ---
 
