@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -eu
+
+title=""
+stream=""
+
+for argument in "$@"; do
+  case "$argument" in
+    --force-media-title=*)
+      title=${argument#--force-media-title=}
+      ;;
+    http://*|https://*)
+      stream=$argument
+      ;;
+  esac
+done
+
+[ -n "$stream" ] || exit 2
+
+if [ -n "$title" ]; then
+  printf 'ANICLI_TITLE\t%s\n' "$(printf '%s' "$title" | sed -E 's/ Episode [0-9]+$//')" >&2
+fi
+
+printf 'ANICLI_STREAM_URL\t%s\n' "$stream" >&2

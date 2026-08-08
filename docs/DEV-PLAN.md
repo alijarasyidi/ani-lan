@@ -22,6 +22,8 @@ Status: complete
 
 ## Phase 2: ani-cli Integration
 
+Status: complete
+
 - Detect the configured `ani-cli` executable and verify its version.
 - Implement controlled subprocess execution with argument arrays, timeouts,
   output limits, and serialized requests.

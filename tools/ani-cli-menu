@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -eu
+
+input=$(cat)
+
+printf '%s\n' "$input" | while IFS= read -r line; do
+  [ -n "$line" ] && printf 'ANICLI_MENU_ROW\t%s\n' "$line" >&2
+done
+
+prompt=""
+for argument in "$@"; do
+  prompt=$argument
+done
+
+case "$prompt" in
+  *"Select anime:"*)
+    selection=${ANICLI_RESULT_INDEX:-1}
+    ;;
+  *"Select episode:"*)
+    if [ "${ANICLI_CAPTURE_MODE:-capture}" != "resolve" ]; then
+      exit 1
+    fi
+    selection=1
+    ;;
+  *)
+    selection=1
+    ;;
+esac
+
+printf '%s\n' "$input" | sed -n "${selection}p"
