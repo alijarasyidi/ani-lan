@@ -69,6 +69,13 @@ button:disabled {
   list-style: none;
 }
 
+#episode-results {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
 .result-button {
   width: 100%;
   text-align: left;

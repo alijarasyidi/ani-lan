@@ -43,6 +43,8 @@ Status: complete
 
 ## Phase 4: Episodes
 
+Status: complete
+
 - Validate anime selection identifiers.
 - Add `GET /api/anime/:id`.
 - Retrieve and display available episode numbers.

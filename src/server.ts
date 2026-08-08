@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 
+import { registerAnimeRoutes } from "./routes/anime.js";
 import { registerSearchRoute } from "./routes/search.js";
 import { AniCliService } from "./services/ani-cli.js";
 
@@ -45,6 +46,7 @@ export async function createServer(aniCli: AniCliService) {
 
   app.get("/health", async () => ({ status: "ok" }));
   await registerSearchRoute(app, aniCli);
+  await registerAnimeRoutes(app, aniCli);
 
   return app;
 }

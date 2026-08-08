@@ -54,6 +54,8 @@ export class AniCliError extends Error {
   }
 }
 
+export class AniCliInputError extends AniCliError {}
+
 interface CommandOutput {
   stdout: string;
   stderr: string;
@@ -128,7 +130,7 @@ export function decodeSelection(value: string): Selection {
   try {
     selection = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
   } catch {
-    throw new AniCliError("Invalid anime selection");
+    throw new AniCliInputError("Invalid anime selection");
   }
 
   if (
@@ -139,7 +141,7 @@ export function decodeSelection(value: string): Selection {
     !Number.isInteger((selection as Selection).index) ||
     (selection as Selection).index < 1
   ) {
-    throw new AniCliError("Invalid anime selection");
+    throw new AniCliInputError("Invalid anime selection");
   }
 
   validateQuery((selection as Selection).query);
@@ -337,13 +339,13 @@ export class AniCliService {
 
 function validateQuery(query: string): void {
   if (query.trim().length === 0 || query.length > maxQueryLength || /[\r\n]/.test(query)) {
-    throw new AniCliError("Anime query is invalid");
+    throw new AniCliInputError("Anime query is invalid");
   }
 }
 
 function validateEpisode(episode: number): void {
   if (!Number.isInteger(episode) || episode < 1 || episode > 10_000) {
-    throw new AniCliError("Episode number is invalid");
+    throw new AniCliInputError("Episode number is invalid");
   }
 }
 
