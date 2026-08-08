@@ -9,7 +9,18 @@
   <body>
     <main>
       <h1>AniLAN</h1>
-      <p>Local anime viewing interface.</p>
+      <form id="search-form">
+        <label for="search-query">Search anime</label>
+        <div class="search-row">
+          <input id="search-query" name="q" type="search" maxlength="120" placeholder="Search anime..." required>
+          <button type="submit">Search</button>
+        </div>
+      </form>
+      <p id="search-status" role="status" aria-live="polite"></p>
+      <section aria-labelledby="results-heading">
+        <h2 id="results-heading">Search results</h2>
+        <ul id="search-results"></ul>
+      </section>
     </main>
     <script type="module" src="/app.js"></script>
   </body>

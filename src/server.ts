@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 
+import { registerSearchRoute } from "./routes/search.js";
 import { AniCliService } from "./services/ani-cli.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,35 +22,58 @@ function readPort(value: string | undefined): number {
 
 const host = process.env.HOST ?? "0.0.0.0";
 const port = readPort(process.env.PORT);
-const app = Fastify({ logger: true });
-const aniCli = new AniCliService();
 
-const aniCliStatus = await aniCli.checkAvailability();
-if (!aniCliStatus.available) {
-  app.log.error({ error: aniCliStatus.error }, "ani-cli is unavailable");
-  process.exit(1);
-} else {
-  app.log.info({ version: aniCliStatus.version }, "ani-cli is available");
+export async function createServer(aniCli: AniCliService) {
+  const app = Fastify({ logger: true });
+
+  await app.register(fastifyStatic, {
+    root: publicDirectory,
+    index: "index.html"
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(error);
+
+    if (!reply.sent) {
+      if (isValidationError(error)) {
+        void reply.status(400).send({ error: "Invalid request." });
+      } else {
+        void reply.status(500).send({ error: "Internal server error" });
+      }
+    }
+  });
+
+  app.get("/health", async () => ({ status: "ok" }));
+  await registerSearchRoute(app, aniCli);
+
+  return app;
 }
 
-await app.register(fastifyStatic, {
-  root: publicDirectory,
-  index: "index.html"
-});
+async function start(): Promise<void> {
+  const aniCli = new AniCliService();
+  const aniCliStatus = await aniCli.checkAvailability();
 
-app.get("/health", async () => ({ status: "ok" }));
-
-app.setErrorHandler((error, request, reply) => {
-  request.log.error(error);
-
-  if (!reply.sent) {
-    void reply.status(500).send({ error: "Internal server error" });
+  if (!aniCliStatus.available) {
+    console.error(`ani-cli is unavailable: ${aniCliStatus.error ?? "unknown error"}`);
+    process.exitCode = 1;
+    return;
   }
-});
 
-try {
-  await app.listen({ host, port });
-} catch (error) {
-  app.log.error(error);
-  process.exitCode = 1;
+  const app = await createServer(aniCli);
+  app.log.info({ version: aniCliStatus.version }, "ani-cli is available");
+
+  try {
+    await app.listen({ host, port });
+  } catch (error) {
+    app.log.error(error);
+    process.exitCode = 1;
+  }
+}
+
+function isValidationError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "validation" in error && Boolean(error.validation);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await start();
 }

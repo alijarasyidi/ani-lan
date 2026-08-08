@@ -34,6 +34,8 @@ Status: complete
 
 ## Phase 3: Search
 
+Status: complete
+
 - Validate `GET /api/search?q=<query>` input.
 - Invoke `ani-cli` through `AniCliService`.
 - Return only reliably extracted result fields.

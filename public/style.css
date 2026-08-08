@@ -14,3 +14,69 @@ main {
   margin: 0 auto;
   padding: 2rem 1rem;
 }
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.search-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input,
+button {
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  border: 1px solid #555;
+  border-radius: 0.35rem;
+  font: inherit;
+}
+
+input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  color: #fff;
+  background: #315ec8;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+#search-status {
+  min-height: 1.5rem;
+}
+
+#search-results {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.result-button {
+  width: 100%;
+  text-align: left;
+  background: #252525;
+}
+
+@media (max-width: 28rem) {
+  .search-row {
+    flex-direction: column;
+  }
+}
