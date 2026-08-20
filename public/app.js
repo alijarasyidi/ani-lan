@@ -126,7 +126,7 @@ lastViewedLink.addEventListener("click", (event) => {
     return;
   }
 
-  void resolveEpisode(saved, saved.episode);
+  void selectAnime(saved, saved.episode);
 });
 
 function renderEpisodes(anime) {
@@ -146,7 +146,7 @@ function renderEpisodes(anime) {
   episodesPanel.hidden = false;
 }
 
-async function selectAnime(item) {
+async function selectAnime(item, episodeToResolve) {
   const requestNumber = ++episodeRequest;
   resolutionRequest += 1;
   hidePlayer();
@@ -168,6 +168,10 @@ async function selectAnime(item) {
 
     renderEpisodes(body);
     setStatus(`${body.title}: ${body.episodes.length} episode${body.episodes.length === 1 ? "" : "s"}.`);
+
+    if (episodeToResolve !== undefined) {
+      await resolveEpisode(body, episodeToResolve);
+    }
   } catch (error) {
     if (requestNumber === episodeRequest) {
       setStatus(error instanceof Error ? error.message : "Could not load episodes.");
