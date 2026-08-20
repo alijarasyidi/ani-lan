@@ -85,6 +85,14 @@ input:focus-visible {
   min-height: 1.5rem;
 }
 
+#last-viewed {
+  margin-bottom: 0;
+}
+
+#last-viewed-link {
+  color: #a9c1ff;
+}
+
 #search-results {
   display: grid;
   gap: 0.5rem;

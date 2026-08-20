@@ -17,20 +17,21 @@
           <button type="submit">Search</button>
         </div>
       </form>
+      <p id="last-viewed" hidden>Last viewed: <a id="last-viewed-link" href="#player-panel"></a></p>
       <p id="search-status" role="status" aria-live="polite"></p>
-      <section aria-labelledby="results-heading">
-        <h2 id="results-heading">Search results</h2>
-        <ul id="search-results" aria-live="polite"></ul>
-      </section>
-      <section id="episodes-panel" aria-labelledby="episodes-heading" hidden>
-        <h2 id="episodes-heading">Episodes</h2>
-        <ul id="episode-results" aria-live="polite"></ul>
-      </section>
       <section id="player-panel" aria-labelledby="player-heading" hidden>
         <h2 id="player-heading">Now playing</h2>
         <p id="player-title"></p>
         <video id="video-player" controls playsinline preload="metadata"></video>
         <p id="player-status" role="status" aria-live="polite"></p>
+      </section>
+      <section id="episodes-panel" aria-labelledby="episodes-heading" hidden>
+        <h2 id="episodes-heading">Episodes</h2>
+        <ul id="episode-results" aria-live="polite"></ul>
+      </section>
+      <section aria-labelledby="results-heading">
+        <h2 id="results-heading">Search results</h2>
+        <ul id="search-results" aria-live="polite"></ul>
       </section>
     </main>
     <script type="module" src="/app.js"></script>

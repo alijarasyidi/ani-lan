@@ -1,5 +1,7 @@
 const form = document.querySelector("#search-form");
 const input = document.querySelector("#search-query");
+const lastViewed = document.querySelector("#last-viewed");
+const lastViewedLink = document.querySelector("#last-viewed-link");
 const status = document.querySelector("#search-status");
 const results = document.querySelector("#search-results");
 const episodesPanel = document.querySelector("#episodes-panel");
@@ -9,6 +11,7 @@ const playerTitle = document.querySelector("#player-title");
 const video = document.querySelector("#video-player");
 const playerStatus = document.querySelector("#player-status");
 const submitButton = form.querySelector("button[type=submit]");
+const LAST_VIEWED_KEY = "anilan:last-viewed";
 let episodeRequest = 0;
 let resolutionRequest = 0;
 
@@ -18,6 +21,47 @@ function setStatus(message) {
 
 function setBusy(element, busy) {
   element.setAttribute("aria-busy", String(busy));
+}
+
+function readLastViewed() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_VIEWED_KEY));
+
+    if (
+      !saved ||
+      typeof saved.id !== "string" ||
+      typeof saved.title !== "string" ||
+      !Number.isInteger(saved.episode) ||
+      saved.episode < 1
+    ) {
+      return null;
+    }
+
+    return saved;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastViewed(anime, episode) {
+  try {
+    localStorage.setItem(
+      LAST_VIEWED_KEY,
+      JSON.stringify({ id: anime.id, title: anime.title, episode })
+    );
+  } catch {
+    // Local storage may be disabled, but playback should still work.
+  }
+  renderLastViewed();
+}
+
+function renderLastViewed() {
+  const saved = readLastViewed();
+  lastViewed.hidden = !saved;
+
+  if (saved) {
+    lastViewedLink.textContent = `${saved.title} - Episode ${saved.episode}`;
+  }
 }
 
 function hidePlayer() {
@@ -54,7 +98,9 @@ async function resolveEpisode(anime, episode) {
     playerPanel.hidden = false;
     setBusy(playerPanel, false);
     playerStatus.textContent = "Stream ready. Press play to watch.";
+    saveLastViewed(anime, episode);
     setStatus(playerTitle.textContent);
+    playerPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     if (requestNumber === resolutionRequest) {
       setStatus(error instanceof Error ? error.message : "Could not resolve this episode.");
@@ -69,6 +115,18 @@ async function resolveEpisode(anime, episode) {
 
 video.addEventListener("error", () => {
   playerStatus.textContent = "This stream cannot be played directly in this browser.";
+});
+
+lastViewedLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  const saved = readLastViewed();
+
+  if (!saved) {
+    renderLastViewed();
+    return;
+  }
+
+  void resolveEpisode(saved, saved.episode);
 });
 
 function renderEpisodes(anime) {
@@ -182,3 +240,5 @@ form.addEventListener("submit", async (event) => {
     setBusy(form, false);
   }
 });
+
+renderLastViewed();
