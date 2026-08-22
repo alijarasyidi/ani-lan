@@ -39,7 +39,15 @@ export async function registerAnimeRoutes(app: FastifyInstance, aniCli: AniCliSe
         }
 
         if (error instanceof AniCliError) {
-          request.log.error({ message: error.message, exitCode: error.exitCode }, "ani-cli episode lookup failed");
+          request.log.error(
+            {
+              message: error.message,
+              exitCode: error.exitCode,
+              failureReason: error.failureReason,
+              diagnostic: error.diagnostic
+            },
+            "ani-cli episode lookup failed"
+          );
         } else {
           request.log.error(error, "ani-cli episode lookup failed");
         }
@@ -83,7 +91,15 @@ export async function registerAnimeRoutes(app: FastifyInstance, aniCli: AniCliSe
         }
 
         if (error instanceof AniCliError) {
-          request.log.error({ message: error.message, exitCode: error.exitCode }, "ani-cli stream resolution failed");
+          request.log.error(
+            {
+              message: error.message,
+              exitCode: error.exitCode,
+              failureReason: error.failureReason,
+              diagnostic: error.diagnostic
+            },
+            "ani-cli stream resolution failed"
+          );
         } else {
           request.log.error(error, "ani-cli stream resolution failed");
         }

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import {
   decodeSelection,
   encodeSelection,
+  AniCliError,
   AniCliService,
+  classifyAniCliFailure,
   parseEpisodeRows,
   parseMarker,
   parseSearchRows
@@ -37,6 +39,78 @@ test("parses capture markers", () => {
   assert.equal(parseMarker(output, "ANICLI_TITLE"), "One Piece");
   assert.equal(parseMarker(output, "ANICLI_STREAM_URL"), "https://example.test/episode.m3u8");
   assert.equal(encodeSelection({ query: "one piece", index: 2 }), "eyJxdWVyeSI6Im9uZSBwaWVjZSIsImluZGV4IjoyfQ");
+});
+
+test("classifies provider failures and removes capture markers from diagnostics", () => {
+  const error = new AniCliError("ani-cli returned no search results", {
+    stderr: "ANICLI_STREAM_URL\thttps://example.test/private.m3u8\n\u001b[1;31mBlocked by cloudflare\u001b[0m"
+  });
+
+  assert.equal(error.failureReason, "cloudflare");
+  assert.equal(error.diagnostic, "Blocked by cloudflare");
+  assert.equal(classifyAniCliFailure("ani-cli exited unsuccessfully", "HTTP 429 Too Many Requests"), "rate-limited");
+});
+
+test("caches successful search metadata for the configured TTL", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-cache-"));
+  const countFile = path.join(directory, "count");
+  const executable = path.join(directory, "ani-cli-cache");
+
+  try {
+    await writeFile(
+      executable,
+      `#!/bin/sh
+count=0
+[ -f '${countFile}' ] && count=$(cat '${countFile}')
+printf '%s' "$((count + 1))" > '${countFile}'
+printf 'ANICLI_MENU_ROW\\t1 One Piece\\n' >&2
+exit 1
+`,
+      "utf8"
+    );
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable, metadataCacheTtlMs: 60_000 });
+    const first = await service.search("one piece");
+    const second = await service.search("one   piece");
+
+    assert.deepEqual(second, first);
+    assert.equal(await readFile(countFile, "utf8"), "1");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("caches successful episode metadata for the configured TTL", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-episode-cache-"));
+  const countFile = path.join(directory, "count");
+  const executable = path.join(directory, "ani-cli-episode-cache");
+
+  try {
+    await writeFile(
+      executable,
+      `#!/bin/sh
+count=0
+[ -f '${countFile}' ] && count=$(cat '${countFile}')
+printf '%s' "$((count + 1))" > '${countFile}'
+printf 'ANICLI_MENU_ROW\\t1 One Piece\\n' >&2
+printf 'ANICLI_MENU_ROW\\t1\\n' >&2
+exit 1
+`,
+      "utf8"
+    );
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable, metadataCacheTtlMs: 60_000 });
+    const id = encodeSelection({ query: "one piece", index: 1 });
+    const first = await service.getEpisodes(id);
+    const second = await service.getEpisodes(id);
+
+    assert.deepEqual(second, first);
+    assert.equal(await readFile(countFile, "utf8"), "1");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("reports a missing ani-cli executable without throwing raw subprocess errors", async () => {

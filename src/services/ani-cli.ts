@@ -8,12 +8,23 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const defaultMenuAdapter = path.join(projectRoot, "tools", "ani-cli-menu");
 const defaultPlayerAdapter = path.join(projectRoot, "tools", "ani-cli-mpv-capture");
 const maxQueryLength = 120;
+const defaultMetadataCacheTtlMs = 5 * 60_000;
 
 export interface AniCliOptions {
   binary?: string;
   timeoutMs?: number;
   maxOutputBytes?: number;
+  metadataCacheTtlMs?: number;
 }
+
+export type AniCliFailureReason =
+  | "cloudflare"
+  | "rate-limited"
+  | "timeout"
+  | "network"
+  | "execution"
+  | "provider"
+  | "unknown";
 
 export interface AniCliStatus {
   available: boolean;
@@ -45,12 +56,19 @@ export interface EpisodeResolution {
 export class AniCliError extends Error {
   readonly exitCode: number | null;
   readonly stderr: string;
+  readonly failureReason: AniCliFailureReason;
+  readonly diagnostic?: string;
 
-  constructor(message: string, options: { exitCode?: number | null; stderr?: string } = {}) {
+  constructor(
+    message: string,
+    options: { exitCode?: number | null; stderr?: string; failureReason?: AniCliFailureReason } = {}
+  ) {
     super(message);
     this.name = "AniCliError";
     this.exitCode = options.exitCode ?? null;
     this.stderr = options.stderr ?? "";
+    this.failureReason = options.failureReason ?? classifyAniCliFailure(message, this.stderr);
+    this.diagnostic = summarizeDiagnostic(this.stderr);
   }
 }
 
@@ -69,6 +87,11 @@ interface CommandOptions {
 interface Selection {
   query: string;
   index: number;
+}
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
 }
 
 export function parseMenuRows(output: string): string[] {
@@ -152,13 +175,19 @@ export class AniCliService {
   private readonly binary: string;
   private readonly timeoutMs: number;
   private readonly maxOutputBytes: number;
+  private readonly metadataCacheTtlMs: number;
   private readonly historyDirectory: string;
+  private readonly searchCache = new Map<string, CacheEntry<AnimeSearchResult[]>>();
+  private readonly episodesCache = new Map<string, CacheEntry<AnimeDetails>>();
   private queue: Promise<void> = Promise.resolve();
 
   constructor(options: AniCliOptions = {}) {
     this.binary = options.binary ?? process.env.ANICLI_BIN ?? "ani-cli";
     this.timeoutMs = options.timeoutMs ?? readPositiveInteger(process.env.ANICLI_TIMEOUT_MS, 60_000);
     this.maxOutputBytes = options.maxOutputBytes ?? readPositiveInteger(process.env.ANICLI_MAX_OUTPUT_BYTES, 1_048_576);
+    this.metadataCacheTtlMs =
+      options.metadataCacheTtlMs ??
+      readPositiveInteger(process.env.ANICLI_METADATA_CACHE_TTL_MS, defaultMetadataCacheTtlMs);
     this.historyDirectory = path.join(os.tmpdir(), "anilan-ani-cli");
   }
 
@@ -183,6 +212,12 @@ export class AniCliService {
   async search(query: string): Promise<AnimeSearchResult[]> {
     validateQuery(query);
 
+    const cacheKey = normalizeCacheKey(query);
+    const cached = this.readCache(this.searchCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const output = await this.enqueue(() =>
       this.run([query], {
         allowedExitCodes: [1],
@@ -198,11 +233,17 @@ export class AniCliService {
       throw new AniCliError("ani-cli returned no search results", { stderr: output.stderr });
     }
 
+    this.writeCache(this.searchCache, cacheKey, results);
     return results;
   }
 
   async getEpisodes(id: string): Promise<AnimeDetails> {
     const selection = decodeSelection(id);
+    const cached = this.readCache(this.episodesCache, id);
+    if (cached) {
+      return cached;
+    }
+
     const output = await this.enqueue(() =>
       this.run([selection.query], {
         allowedExitCodes: [1],
@@ -222,7 +263,9 @@ export class AniCliService {
       throw new AniCliError("ani-cli returned no episodes", { stderr: output.stderr });
     }
 
-    return { id, title: selectedResult.title, episodes };
+    const details = { id, title: selectedResult.title, episodes };
+    this.writeCache(this.episodesCache, id, details);
+    return details;
   }
 
   async resolveEpisode(id: string, episode: number): Promise<EpisodeResolution> {
@@ -328,6 +371,24 @@ export class AniCliService {
     });
   }
 
+  private readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
+    const entry = cache.get(key);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (entry.expiresAt <= Date.now()) {
+      cache.delete(key);
+      return undefined;
+    }
+
+    return entry.value;
+  }
+
+  private writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): void {
+    cache.set(key, { value, expiresAt: Date.now() + this.metadataCacheTtlMs });
+  }
+
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.queue.then(operation, operation);
     this.queue = next.then(
@@ -361,6 +422,57 @@ function validateEpisode(episode: number): void {
   if (!Number.isInteger(episode) || episode < 1 || episode > 10_000) {
     throw new AniCliInputError("Episode number is invalid");
   }
+}
+
+export function classifyAniCliFailure(message: string, stderr = ""): AniCliFailureReason {
+  const output = `${message}\n${stderr}`.toLowerCase();
+
+  if (
+    /blocked by cloudflare|just a moment|cf-chl-|challenge-platform|attention required|checking your browser/.test(
+      output
+    )
+  ) {
+    return "cloudflare";
+  }
+
+  if (/\b429\b|too many requests|rate[ -]?limit|retry[ -]?after/.test(output)) {
+    return "rate-limited";
+  }
+
+  if (/timed out|timeout/.test(output)) {
+    return "timeout";
+  }
+
+  if (/unable to start ani-cli/.test(output)) {
+    return "execution";
+  }
+
+  if (/could not resolve|failed to connect|connection reset|network is unreachable|tls|ssl|curl:/.test(output)) {
+    return "network";
+  }
+
+  if (/no results|no episodes|no valid sources|no browser-playable stream|exited unsuccessfully/.test(output)) {
+    return "provider";
+  }
+
+  return "unknown";
+}
+
+function summarizeDiagnostic(stderr: string): string | undefined {
+  const lines = stderr
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").trim())
+    .filter((line) => line.length > 0 && !line.startsWith("ANICLI_"));
+
+  if (lines.length === 0) {
+    return undefined;
+  }
+
+  return lines.slice(-3).join(" | ").slice(0, 500);
+}
+
+function normalizeCacheKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function decodeTitle(value: string): string {

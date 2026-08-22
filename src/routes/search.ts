@@ -37,7 +37,15 @@ export async function registerSearchRoute(app: FastifyInstance, aniCli: AniCliSe
         return { results: await aniCli.search(query) };
       } catch (error) {
         if (error instanceof AniCliError) {
-          request.log.error({ message: error.message, exitCode: error.exitCode }, "ani-cli search failed");
+          request.log.error(
+            {
+              message: error.message,
+              exitCode: error.exitCode,
+              failureReason: error.failureReason,
+              diagnostic: error.diagnostic
+            },
+            "ani-cli search failed"
+          );
         } else {
           request.log.error(error, "ani-cli search failed");
         }

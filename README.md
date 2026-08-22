@@ -269,6 +269,7 @@ PORT=3000
 ANICLI_BIN=ani-cli
 ANICLI_TIMEOUT_MS=60000
 ANICLI_MAX_OUTPUT_BYTES=1048576
+ANICLI_METADATA_CACHE_TTL_MS=300000
 ```
 
 ### `HOST`
@@ -309,6 +310,11 @@ Maximum time allowed for one `ani-cli` subprocess. Default: `60000`.
 
 Maximum combined stdout/stderr captured from one subprocess. Default:
 `1048576`.
+
+### `ANICLI_METADATA_CACHE_TTL_MS`
+
+Time to cache successful search results and episode lists in milliseconds.
+Default: `300000` (5 minutes). Resolved stream URLs are never cached.
 
 ---
 
