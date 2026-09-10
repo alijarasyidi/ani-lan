@@ -52,6 +52,7 @@ export interface EpisodeResolution {
   episode: number;
   streamUrl: string;
   streamReferrer?: string;
+  subtitleUrl?: string;
 }
 
 export class AniCliError extends Error {
@@ -288,6 +289,7 @@ export class AniCliService {
     const title = parseMarker(output.stderr, "ANICLI_TITLE");
     const streamUrl = parseMarker(output.stderr, "ANICLI_STREAM_URL");
     const streamReferrer = parseMarker(output.stderr, "ANICLI_STREAM_REFERRER");
+    const subtitleUrl = parseMarker(output.stderr, "ANICLI_SUBTITLE_URL");
 
     if (!title || !streamUrl || !isHttpUrl(streamUrl)) {
       throw new AniCliError("ani-cli returned no browser-playable stream", { stderr: output.stderr });
@@ -297,7 +299,8 @@ export class AniCliService {
       title,
       episode,
       streamUrl,
-      ...(streamReferrer && isHttpUrl(streamReferrer) ? { streamReferrer } : {})
+      ...(streamReferrer && isHttpUrl(streamReferrer) ? { streamReferrer } : {}),
+      ...(subtitleUrl && isHttpUrl(subtitleUrl) ? { subtitleUrl } : {})
     };
   }
 

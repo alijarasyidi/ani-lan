@@ -90,9 +90,20 @@ export async function registerAnimeRoutes(
     async (request, reply) => {
       try {
         const resolution = await aniCli.resolveEpisode(request.params.id, Number(request.params.episode));
-        const { streamUrl, streamReferrer: _streamReferrer, ...publicResolution } = resolution;
+        const {
+          streamUrl,
+          streamReferrer: _streamReferrer,
+          subtitleUrl,
+          ...publicResolution
+        } = resolution;
 
-        return { ...publicResolution, streamUrl: streamProxy.create(streamUrl, _streamReferrer) };
+        return {
+          ...publicResolution,
+          streamUrl: streamProxy.create(streamUrl, _streamReferrer),
+          ...(subtitleUrl
+            ? { subtitleUrl: streamProxy.create(subtitleUrl, _streamReferrer) }
+            : {})
+        };
       } catch (error) {
         if (error instanceof AniCliInputError) {
           return reply.status(400).send({ error: "Invalid episode request." });

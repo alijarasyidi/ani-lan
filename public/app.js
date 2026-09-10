@@ -66,12 +66,27 @@ function renderLastViewed() {
 
 function hidePlayer() {
   video.pause();
+  video.querySelectorAll("track").forEach((track) => track.remove());
   video.removeAttribute("src");
   video.load();
   playerPanel.hidden = true;
   setBusy(playerPanel, false);
   playerTitle.textContent = "";
   playerStatus.textContent = "";
+}
+
+function addSubtitleTrack(url) {
+  if (typeof url !== "string" || url.length === 0) {
+    return;
+  }
+
+  const track = document.createElement("track");
+  track.kind = "subtitles";
+  track.label = "English";
+  track.srclang = "en";
+  track.src = url;
+  track.default = true;
+  video.append(track);
 }
 
 async function resolveEpisode(anime, episode) {
@@ -93,6 +108,7 @@ async function resolveEpisode(anime, episode) {
     }
 
     playerTitle.textContent = `${body.title} - Episode ${body.episode}`;
+    addSubtitleTrack(body.subtitleUrl);
     video.src = body.streamUrl;
     video.load();
     playerPanel.hidden = false;

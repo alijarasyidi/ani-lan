@@ -5,6 +5,7 @@ set -eu
 title=""
 stream=""
 referrer=""
+subtitle=""
 
 for argument in "$@"; do
   case "$argument" in
@@ -13,6 +14,9 @@ for argument in "$@"; do
       ;;
     --referrer=*)
       referrer=${argument#--referrer=}
+      ;;
+    --sub-file=*)
+      subtitle=${argument#--sub-file=}
       ;;
     http://*|https://*)
       stream=$argument
@@ -27,4 +31,5 @@ if [ -n "$title" ]; then
 fi
 
 [ -n "$referrer" ] && printf 'ANICLI_STREAM_REFERRER\t%s\n' "$referrer" >&2
+[ -n "$subtitle" ] && printf 'ANICLI_SUBTITLE_URL\t%s\n' "$subtitle" >&2
 printf 'ANICLI_STREAM_URL\t%s\n' "$stream" >&2

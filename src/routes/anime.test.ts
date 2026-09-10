@@ -55,7 +55,8 @@ test("episode route returns a resolved stream", async () => {
   const resolution = {
     title: "One Piece",
     episode: 1,
-    streamUrl: "https://example.test/episode.m3u8"
+    streamUrl: "https://example.test/episode.m3u8",
+    subtitleUrl: "https://example.test/episode.vtt"
   };
   const app = await createServer({
     resolveEpisode: async () => resolution
@@ -71,6 +72,7 @@ test("episode route returns a resolved stream", async () => {
   assert.equal(body.title, resolution.title);
   assert.equal(body.episode, resolution.episode);
   assert.match(body.streamUrl, /^\/api\/stream\/[A-Za-z0-9_-]+$/);
+  assert.match(body.subtitleUrl, /^\/api\/stream\/[A-Za-z0-9_-]+$/);
   await app.close();
 });
 

@@ -153,6 +153,7 @@ test("captures the provider referrer with a resolved stream", async () => {
       `#!/bin/sh
 printf 'ANICLI_TITLE\\tMy Anime\\n' >&2
 printf 'ANICLI_STREAM_REFERRER\\thttps://zokoanime.video/\\n' >&2
+printf 'ANICLI_SUBTITLE_URL\\thttps://example.test/episode.vtt\\n' >&2
 printf 'ANICLI_STREAM_URL\\thttps://example.test/episode.m3u8\\n' >&2
 exit 0
 `,
@@ -170,7 +171,8 @@ exit 0
       title: "My Anime",
       episode: 1,
       streamUrl: "https://example.test/episode.m3u8",
-      streamReferrer: "https://zokoanime.video/"
+      streamReferrer: "https://zokoanime.video/",
+      subtitleUrl: "https://example.test/episode.vtt"
     });
   } finally {
     await rm(directory, { recursive: true, force: true });
