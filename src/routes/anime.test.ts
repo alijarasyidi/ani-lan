@@ -67,7 +67,10 @@ test("episode route returns a resolved stream", async () => {
   });
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), resolution);
+  const body = response.json();
+  assert.equal(body.title, resolution.title);
+  assert.equal(body.episode, resolution.episode);
+  assert.match(body.streamUrl, /^\/api\/stream\/[A-Za-z0-9_-]+$/);
   await app.close();
 });
 

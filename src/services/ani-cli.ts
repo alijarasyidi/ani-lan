@@ -51,6 +51,7 @@ export interface EpisodeResolution {
   title: string;
   episode: number;
   streamUrl: string;
+  streamReferrer?: string;
 }
 
 export class AniCliError extends Error {
@@ -254,16 +255,25 @@ export class AniCliService {
       })
     );
     const menuRows = parseMenuRows(output.stderr);
-    const episodes = parseEpisodeRows(menuRows);
+    const listedEpisodes = parseEpisodeRows(menuRows);
     const selectedResult = parseSearchRows(menuRows, selection.query).find(
       (result) => decodeSelection(result.id).index === selection.index
     );
+    const directTitle = parseMarker(output.stderr, "ANICLI_TITLE");
+    const directStreamUrl = parseMarker(output.stderr, "ANICLI_STREAM_URL");
+    const episodes =
+      listedEpisodes.length > 0
+        ? listedEpisodes
+        : directStreamUrl && isHttpUrl(directStreamUrl)
+          ? [{ number: 1 }]
+          : [];
+    const title = selectedResult?.title ?? directTitle;
 
-    if (!selectedResult || episodes.length === 0) {
+    if (!title || episodes.length === 0) {
       throw new AniCliError("ani-cli returned no episodes", { stderr: output.stderr });
     }
 
-    const details = { id, title: selectedResult.title, episodes };
+    const details = { id, title, episodes };
     this.writeCache(this.episodesCache, id, details);
     return details;
   }
@@ -277,12 +287,18 @@ export class AniCliService {
     );
     const title = parseMarker(output.stderr, "ANICLI_TITLE");
     const streamUrl = parseMarker(output.stderr, "ANICLI_STREAM_URL");
+    const streamReferrer = parseMarker(output.stderr, "ANICLI_STREAM_REFERRER");
 
     if (!title || !streamUrl || !isHttpUrl(streamUrl)) {
       throw new AniCliError("ani-cli returned no browser-playable stream", { stderr: output.stderr });
     }
 
-    return { title, episode, streamUrl };
+    return {
+      title,
+      episode,
+      streamUrl,
+      ...(streamReferrer && isHttpUrl(streamReferrer) ? { streamReferrer } : {})
+    };
   }
 
   private async run(args: string[], options: CommandOptions = {}): Promise<CommandOutput> {

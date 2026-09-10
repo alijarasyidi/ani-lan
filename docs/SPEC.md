@@ -259,7 +259,9 @@ The frontend should use the returned stream URL in the HTML5 video player when p
 
 ### Preferred approach
 
-Do NOT proxy the entire video through Node.js unless necessary.
+Do not proxy or transcode the complete video through Node.js unless necessary.
+The browser receives a same-origin AniLAN stream URL, while AniLAN proxies the
+HLS playlist and media requests required for playback.
 
 Preferred flow:
 
@@ -275,27 +277,21 @@ Node.js
 ani-cli
   │
   ▼
-stream URL
+Provider stream
+  │
+  ▼
+AniLAN HLS proxy
   │
   ▼
 Phone browser
 ```
 
-This prevents the local Node server from unnecessarily downloading and re-uploading the entire video.
+This handles provider-specific CORS and referrer requirements without
+downloading and re-uploading the complete video through Node.js.
 
-### Fallback
-
-If direct browser playback fails because of provider-specific issues such as:
-
-- CORS
-- required request headers
-- unsupported stream format
-- HLS/browser compatibility
-- provider restrictions
-
-then a backend streaming proxy may be introduced.
-
-That is **not part of v0 unless required**.
+The proxy forwards the provider referrer captured from `ani-cli` and rewrites
+HLS playlist resources to same-origin AniLAN URLs. Browser-native HLS support
+is still required.
 
 ---
 

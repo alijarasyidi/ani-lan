@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { AniCliInputError, AniCliError, type AniCliService } from "../services/ani-cli.js";
+import { StreamProxy } from "../services/stream-proxy.js";
 
 interface AnimeParams {
   id: string;
@@ -10,7 +11,11 @@ interface EpisodeParams extends AnimeParams {
   episode: string;
 }
 
-export async function registerAnimeRoutes(app: FastifyInstance, aniCli: AniCliService): Promise<void> {
+export async function registerAnimeRoutes(
+  app: FastifyInstance,
+  aniCli: AniCliService,
+  streamProxy = new StreamProxy()
+): Promise<void> {
   await app.get<{ Params: AnimeParams }>(
     "/api/anime/:id",
     {
@@ -84,7 +89,10 @@ export async function registerAnimeRoutes(app: FastifyInstance, aniCli: AniCliSe
     },
     async (request, reply) => {
       try {
-        return await aniCli.resolveEpisode(request.params.id, Number(request.params.episode));
+        const resolution = await aniCli.resolveEpisode(request.params.id, Number(request.params.episode));
+        const { streamUrl, streamReferrer: _streamReferrer, ...publicResolution } = resolution;
+
+        return { ...publicResolution, streamUrl: streamProxy.create(streamUrl, _streamReferrer) };
       } catch (error) {
         if (error instanceof AniCliInputError) {
           return reply.status(400).send({ error: "Invalid episode request." });

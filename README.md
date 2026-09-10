@@ -352,7 +352,9 @@ The API should remain independent of the underlying `ani-cli` implementation.
 
 ## ▶️ Video Playback
 
-AniLAN prefers to return a resolved stream URL directly to the browser rather than proxying the entire video through the local server.
+AniLAN returns a same-origin stream URL to the browser. The local server proxies
+the resolved HLS playlist and media segments so provider CORS and referrer
+requirements do not prevent playback on Safari or other mobile browsers.
 
 Preferred flow:
 
@@ -366,20 +368,23 @@ AniLAN
 ani-cli
   │
   ▼
-Stream URL
+Provider stream
+  │
+  ▼
+AniLAN stream proxy
   │
   ▼
 Phone Browser
 ```
 
-This avoids unnecessarily routing the entire video through AniLAN.
+The proxy only handles the playlist and the media requests needed by the
+browser; AniLAN does not download or transcode the complete video itself.
 
-If a provider requires additional handling — such as specific headers, CORS workarounds, or browser-incompatible streams — a backend streaming proxy may be introduced later.
+The proxy forwards the provider referrer captured from `ani-cli` and rewrites
+HLS playlist resources to same-origin AniLAN URLs.
 
-The v0 implementation does not add an HLS library or streaming proxy. Safari
-and iOS browsers commonly support HLS directly; some Android browsers may not.
-If the target phone cannot play the returned `.m3u8` URL, browser testing must
-determine whether a client-side HLS library or a backend proxy is necessary.
+Safari and iOS browsers commonly support HLS directly; some Android browsers
+may not. AniLAN still depends on the browser's native HLS support.
 
 ---
 

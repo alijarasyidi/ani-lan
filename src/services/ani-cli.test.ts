@@ -113,6 +113,70 @@ exit 1
   }
 });
 
+test("treats a directly resolved one-item title as episode one", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-movie-"));
+  const executable = path.join(directory, "ani-cli-movie");
+
+  try {
+    await writeFile(
+      executable,
+      `#!/bin/sh
+printf 'ANICLI_MENU_ROW\\t1 My Movie\\n' >&2
+printf 'ANICLI_TITLE\\tMy Movie\\n' >&2
+printf 'ANICLI_STREAM_URL\\thttps://example.test/movie.m3u8\\n' >&2
+exit 0
+`,
+      "utf8"
+    );
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable });
+    const details = await service.getEpisodes(encodeSelection({ query: "my movie", index: 1 }));
+
+    assert.deepEqual(details, {
+      id: encodeSelection({ query: "my movie", index: 1 }),
+      title: "My Movie",
+      episodes: [{ number: 1 }]
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("captures the provider referrer with a resolved stream", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-referrer-"));
+  const executable = path.join(directory, "ani-cli-referrer");
+
+  try {
+    await writeFile(
+      executable,
+      `#!/bin/sh
+printf 'ANICLI_TITLE\\tMy Anime\\n' >&2
+printf 'ANICLI_STREAM_REFERRER\\thttps://zokoanime.video/\\n' >&2
+printf 'ANICLI_STREAM_URL\\thttps://example.test/episode.m3u8\\n' >&2
+exit 0
+`,
+      "utf8"
+    );
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable });
+    const resolution = await service.resolveEpisode(
+      encodeSelection({ query: "my anime", index: 1 }),
+      1
+    );
+
+    assert.deepEqual(resolution, {
+      title: "My Anime",
+      episode: 1,
+      streamUrl: "https://example.test/episode.m3u8",
+      streamReferrer: "https://zokoanime.video/"
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("reports a missing ani-cli executable without throwing raw subprocess errors", async () => {
   const service = new AniCliService({ binary: "ani-cli-does-not-exist", timeoutMs: 1_000 });
   const status = await service.checkAvailability();

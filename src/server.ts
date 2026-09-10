@@ -7,6 +7,8 @@ import Fastify from "fastify";
 import { registerAnimeRoutes } from "./routes/anime.js";
 import { registerSearchRoute } from "./routes/search.js";
 import { AniCliService } from "./services/ani-cli.js";
+import { registerStreamRoute } from "./routes/stream.js";
+import { StreamProxy } from "./services/stream-proxy.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicDirectory = path.join(projectRoot, "public");
@@ -45,8 +47,10 @@ export async function createServer(aniCli: AniCliService) {
   });
 
   app.get("/health", async () => ({ status: "ok" }));
+  const streamProxy = new StreamProxy();
+  await registerStreamRoute(app, streamProxy);
   await registerSearchRoute(app, aniCli);
-  await registerAnimeRoutes(app, aniCli);
+  await registerAnimeRoutes(app, aniCli, streamProxy);
 
   return app;
 }
