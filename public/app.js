@@ -10,10 +10,21 @@ const playerPanel = document.querySelector("#player-panel");
 const playerTitle = document.querySelector("#player-title");
 const video = document.querySelector("#video-player");
 const playerStatus = document.querySelector("#player-status");
+const qualityControl = document.querySelector("#player-quality-control");
+const qualitySelect = document.querySelector("#player-quality");
+const episodeNav = document.querySelector("#episode-nav");
+const previousEpisodeButton = document.querySelector("#previous-episode");
+const nextEpisodeButton = document.querySelector("#next-episode");
+const settingsToggle = document.querySelector("#settings-toggle");
+const settingsPanel = document.querySelector("#settings-panel");
+const preferredQualitySelect = document.querySelector("#preferred-quality");
 const submitButton = form.querySelector("button[type=submit]");
 const LAST_VIEWED_KEY = "anilan:last-viewed";
+const PREFERRED_QUALITY_KEY = "anilan:preferred-quality";
 let episodeRequest = 0;
 let resolutionRequest = 0;
+let currentPlayback = null;
+let pendingSeek = null;
 
 function setStatus(message) {
   status.textContent = message;
@@ -64,15 +75,40 @@ function renderLastViewed() {
   }
 }
 
+function readPreferredQuality() {
+  try {
+    const saved = localStorage.getItem(PREFERRED_QUALITY_KEY);
+    return [...preferredQualitySelect.options].some((option) => option.value === saved) ? saved : "";
+  } catch {
+    return "";
+  }
+}
+
+function savePreferredQuality(quality) {
+  try {
+    localStorage.setItem(PREFERRED_QUALITY_KEY, quality);
+  } catch {
+    // Local storage may be disabled, but the preference still applies on this page.
+  }
+}
+
 function hidePlayer() {
   video.pause();
-  video.querySelectorAll("track").forEach((track) => track.remove());
+  clearSubtitleTracks();
   video.removeAttribute("src");
   video.load();
   playerPanel.hidden = true;
   setBusy(playerPanel, false);
   playerTitle.textContent = "";
   playerStatus.textContent = "";
+  currentPlayback = null;
+  pendingSeek = null;
+  qualityControl.hidden = true;
+  episodeNav.hidden = true;
+}
+
+function clearSubtitleTracks() {
+  video.querySelectorAll("track").forEach((track) => track.remove());
 }
 
 function addSubtitleTrack(url) {
@@ -89,6 +125,96 @@ function addSubtitleTrack(url) {
   video.append(track);
 }
 
+async function fetchEpisodeStream(anime, episode, quality) {
+  const query = quality ? `?quality=${encodeURIComponent(quality)}` : "";
+  const response = await fetch(`/api/anime/${encodeURIComponent(anime.id)}/episode/${episode}${query}`);
+  const body = await response.json();
+
+  if (!response.ok) {
+    throw new Error(body.error ?? "Could not resolve this episode.");
+  }
+
+  return body;
+}
+
+function loadStream(anime, body, { resumeAt = null, autoplay = false } = {}) {
+  currentPlayback = { anime, episode: body.episode, quality: body.quality };
+  playerTitle.textContent = `${body.title} - Episode ${body.episode}`;
+  clearSubtitleTracks();
+  addSubtitleTrack(body.subtitleUrl);
+  renderQualities(body.qualities ?? [], body.quality);
+  renderEpisodeNav();
+  pendingSeek = resumeAt;
+  video.src = body.streamUrl;
+  video.load();
+
+  if (autoplay) {
+    void video.play().catch(() => {
+      // Browsers may block autoplay after a source change; the viewer can press play.
+    });
+  }
+}
+
+function renderQualities(qualities, selected) {
+  qualitySelect.replaceChildren(...qualities.map((quality) => new Option(quality, quality)));
+  qualitySelect.value = selected ?? "";
+  qualitySelect.disabled = false;
+  qualityControl.hidden = qualities.length < 2;
+}
+
+function renderEpisodeNav() {
+  const { anime, episode } = currentPlayback;
+  const index = anime.episodes.findIndex((item) => item.number === episode);
+
+  episodeNav.hidden = anime.episodes.length < 2;
+  previousEpisodeButton.disabled = index <= 0;
+  nextEpisodeButton.disabled = index === -1 || index === anime.episodes.length - 1;
+}
+
+function openAdjacentEpisode(offset) {
+  if (!currentPlayback) {
+    return;
+  }
+
+  const { anime, episode } = currentPlayback;
+  const index = anime.episodes.findIndex((item) => item.number === episode);
+  const target = index === -1 ? undefined : anime.episodes[index + offset];
+
+  if (target) {
+    void resolveEpisode(anime, target.number);
+  }
+}
+
+async function changeQuality(quality) {
+  if (!currentPlayback) {
+    return;
+  }
+
+  const { anime, episode } = currentPlayback;
+  const requestNumber = ++resolutionRequest;
+  const resumeAt = video.currentTime;
+  const wasPlaying = !video.paused;
+  qualitySelect.disabled = true;
+  playerStatus.textContent = `Switching to ${quality}...`;
+
+  try {
+    const body = await fetchEpisodeStream(anime, episode, quality);
+
+    if (requestNumber !== resolutionRequest) {
+      return;
+    }
+
+    loadStream(anime, body, { resumeAt, autoplay: wasPlaying });
+    playerStatus.textContent = body.quality ? `Switched to ${body.quality}.` : "Stream ready.";
+  } catch (error) {
+    if (requestNumber === resolutionRequest) {
+      playerStatus.textContent = error instanceof Error ? error.message : "Could not switch resolution.";
+      qualitySelect.value = currentPlayback.quality ?? "";
+      qualitySelect.disabled = false;
+    }
+  }
+}
+
 async function resolveEpisode(anime, episode) {
   const requestNumber = ++resolutionRequest;
   hidePlayer();
@@ -97,20 +223,13 @@ async function resolveEpisode(anime, episode) {
   playerStatus.textContent = "Resolving stream...";
 
   try {
-    const response = await fetch(`/api/anime/${encodeURIComponent(anime.id)}/episode/${episode}`);
-    const body = await response.json();
+    const body = await fetchEpisodeStream(anime, episode, preferredQualitySelect.value);
 
     if (requestNumber !== resolutionRequest) {
       return;
     }
-    if (!response.ok) {
-      throw new Error(body.error ?? "Could not resolve this episode.");
-    }
 
-    playerTitle.textContent = `${body.title} - Episode ${body.episode}`;
-    addSubtitleTrack(body.subtitleUrl);
-    video.src = body.streamUrl;
-    video.load();
+    loadStream(anime, body);
     playerPanel.hidden = false;
     setBusy(playerPanel, false);
     playerStatus.textContent = "Stream ready. Press play to watch.";
@@ -131,6 +250,26 @@ async function resolveEpisode(anime, episode) {
 
 video.addEventListener("error", () => {
   playerStatus.textContent = "This stream cannot be played directly in this browser.";
+});
+
+video.addEventListener("loadedmetadata", () => {
+  if (pendingSeek !== null) {
+    video.currentTime = pendingSeek;
+    pendingSeek = null;
+  }
+});
+
+qualitySelect.addEventListener("change", () => void changeQuality(qualitySelect.value));
+previousEpisodeButton.addEventListener("click", () => openAdjacentEpisode(-1));
+nextEpisodeButton.addEventListener("click", () => openAdjacentEpisode(1));
+
+settingsToggle.addEventListener("click", () => {
+  settingsPanel.hidden = !settingsPanel.hidden;
+  settingsToggle.setAttribute("aria-expanded", String(!settingsPanel.hidden));
+});
+
+preferredQualitySelect.addEventListener("change", () => {
+  savePreferredQuality(preferredQualitySelect.value);
 });
 
 lastViewedLink.addEventListener("click", (event) => {
@@ -261,4 +400,5 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+preferredQualitySelect.value = readPreferredQuality();
 renderLastViewed();

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  chooseQuality,
   decodeSelection,
   encodeSelection,
   AniCliError,
@@ -12,6 +13,7 @@ import {
   classifyAniCliFailure,
   parseEpisodeRows,
   parseMarker,
+  parseQualityLinks,
   parseSearchRows
 } from "./ani-cli.js";
 
@@ -172,8 +174,73 @@ exit 0
       episode: 1,
       streamUrl: "https://example.test/episode.m3u8",
       streamReferrer: "https://zokoanime.video/",
-      subtitleUrl: "https://example.test/episode.vtt"
+      subtitleUrl: "https://example.test/episode.vtt",
+      qualities: []
     });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("parses listed qualities highest first and ignores other rows", () => {
+  const output = [
+    "All links:",
+    "360p >https://example.test/360/index.m3u8",
+    "1080p >https://example.test/1080/index.m3u8",
+    "720p >https://example.test/720/index.m3u8",
+    "720p >https://example.test/720/index.m3u8",
+    "Selected link:",
+    "https://example.test/1080/index.m3u8",
+    "Subtitles:",
+    ""
+  ].join("\n");
+
+  assert.deepEqual(parseQualityLinks(output), ["1080p", "720p", "360p"]);
+  assert.deepEqual(parseQualityLinks("Selected link:\nhttps://example.test/index.m3u8\n"), []);
+});
+
+test("chooses the preferred quality when listed and the highest otherwise", () => {
+  assert.equal(chooseQuality(["1080p", "720p", "360p"], "720p"), "720p");
+  assert.equal(chooseQuality(["1080p", "720p", "360p"], "480p"), "1080p");
+  assert.equal(chooseQuality(["1080p", "720p", "360p"]), "1080p");
+  assert.equal(chooseQuality([], "720p"), undefined);
+});
+
+test("resolves the preferred listed quality and falls back to the highest", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "anilan-quality-"));
+  const executable = path.join(directory, "ani-cli-quality");
+
+  try {
+    await writeFile(
+      executable,
+      `#!/bin/sh
+if [ "$ANI_CLI_PLAYER" = "debug" ]; then
+  printf 'All links:\\n1080p >https://example.test/1080p.m3u8\\n720p >https://example.test/720p.m3u8\\n360p >https://example.test/360p.m3u8\\nSelected link:\\nhttps://example.test/1080p.m3u8\\nSubtitles:\\n\\n'
+  exit 0
+fi
+printf 'ANICLI_TITLE\\tMy Anime\\n' >&2
+printf 'ANICLI_STREAM_URL\\thttps://example.test/%s.m3u8\\n' "$ANI_CLI_QUALITY" >&2
+exit 0
+`,
+      "utf8"
+    );
+    await chmod(executable, 0o755);
+
+    const service = new AniCliService({ binary: executable });
+    const id = encodeSelection({ query: "my anime", index: 1 });
+
+    const preferred = await service.resolveEpisode(id, 1, "720p");
+    assert.equal(preferred.quality, "720p");
+    assert.equal(preferred.streamUrl, "https://example.test/720p.m3u8");
+    assert.deepEqual(preferred.qualities, ["1080p", "720p", "360p"]);
+
+    const fallback = await service.resolveEpisode(id, 1, "480p");
+    assert.equal(fallback.quality, "1080p");
+    assert.equal(fallback.streamUrl, "https://example.test/1080p.m3u8");
+
+    const defaulted = await service.resolveEpisode(id, 1);
+    assert.equal(defaulted.quality, "1080p");
+    assert.deepEqual(defaulted.qualities, ["1080p", "720p", "360p"]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

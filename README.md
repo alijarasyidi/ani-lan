@@ -26,7 +26,8 @@ The initial version intentionally focuses on the essentials:
 
 - 🔎 Search anime through `ani-cli`
 - 📋 Browse available anime results
-- 🎞️ Select episodes
+- 🎞️ Select episodes and step to the previous or next episode while watching
+- ⚙️ Choose a preferred resolution in Settings (saved in this browser), or switch resolution while watching
 - ▶️ Watch through a browser-based video player
 - 📱 Mobile-friendly interface
 - 🏠 Designed for private home-LAN usage
@@ -341,10 +342,15 @@ Returns information required to display the anime's available episodes.
 ### Episode
 
 ```http
-GET /api/anime/:id/episode/:episode
+GET /api/anime/:id/episode/:episode?quality=<quality>
 ```
 
 Resolves the selected episode into a browser-playable stream when supported.
+
+The optional `quality` parameter (for example `720p`) requests a preferred
+resolution. When it is omitted or the provider does not offer it, the highest
+available resolution is used. The response includes the selected `quality` and
+the available `qualities`, highest first.
 
 The API should remain independent of the underlying `ani-cli` implementation.
 

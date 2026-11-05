@@ -18,6 +18,10 @@ main {
   padding: max(1.25rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 
+[hidden] {
+  display: none !important;
+}
+
 h1,
 h2 {
   margin-top: 0;
@@ -26,6 +30,22 @@ h2 {
 h1 {
   margin-bottom: 1.5rem;
   font-size: clamp(1.75rem, 8vw, 2.5rem);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.app-header h1 {
+  margin: 0;
+}
+
+#settings-panel {
+  margin-bottom: 2rem;
 }
 
 h2 {
@@ -48,6 +68,7 @@ label {
 }
 
 input,
+select,
 button {
   min-height: 2.75rem;
   box-sizing: border-box;
@@ -63,6 +84,15 @@ input {
   font-size: 1rem;
 }
 
+select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  color: #f5f5f5;
+  background: #252525;
+}
+
 button {
   padding: 0.5rem 1rem;
   color: #fff;
@@ -76,9 +106,20 @@ button:disabled {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid #8fb1ff;
   outline-offset: 2px;
+}
+
+#settings-toggle {
+  background: #252525;
+}
+
+.hint {
+  margin-bottom: 0;
+  color: #bcbcbc;
+  font-size: 0.9rem;
 }
 
 #search-status {
@@ -134,6 +175,27 @@ input:focus-visible {
 
 #player-status {
   min-height: 1.5rem;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.control-row label {
+  margin-bottom: 0;
+}
+
+.episode-nav {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.episode-nav button {
+  flex: 1;
 }
 
 @media (max-width: 28rem) {

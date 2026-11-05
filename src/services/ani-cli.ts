@@ -9,6 +9,9 @@ const defaultMenuAdapter = path.join(projectRoot, "tools", "ani-cli-menu");
 const defaultPlayerAdapter = path.join(projectRoot, "tools", "ani-cli-mpv-capture");
 const maxQueryLength = 120;
 const defaultMetadataCacheTtlMs = 5 * 60_000;
+const qualityLabelPattern = /^[1-9][0-9]{2,3}p$/;
+// ani-cli's debug player prints every quality link it found instead of playing one.
+const qualityListingPlayer = "debug";
 
 export interface AniCliOptions {
   binary?: string;
@@ -53,6 +56,8 @@ export interface EpisodeResolution {
   streamUrl: string;
   streamReferrer?: string;
   subtitleUrl?: string;
+  quality?: string;
+  qualities: string[];
 }
 
 export class AniCliError extends Error {
@@ -137,6 +142,35 @@ export function parseEpisodeRows(rows: string[]): AnimeEpisode[] {
   }
 
   return [...episodes].sort((left, right) => left - right).map((number) => ({ number }));
+}
+
+export function parseQualityLinks(output: string): string[] {
+  const lines = output.split(/\r?\n/);
+  const start = lines.indexOf("All links:");
+  const end = lines.indexOf("Selected link:");
+
+  if (start === -1 || end <= start) {
+    return [];
+  }
+
+  const qualities = new Set<string>();
+  for (const line of lines.slice(start + 1, end)) {
+    const [label] = line.split(" >");
+    if (qualityLabelPattern.test(label)) {
+      qualities.add(label);
+    }
+  }
+
+  return [...qualities].sort((left, right) => Number.parseInt(right, 10) - Number.parseInt(left, 10));
+}
+
+export function chooseQuality(qualities: string[], preferred?: string): string | undefined {
+  if (preferred !== undefined && qualities.includes(preferred)) {
+    return preferred;
+  }
+
+  // Qualities are ordered highest first, so the fallback is the best available.
+  return qualities[0];
 }
 
 export function parseMarker(output: string, marker: string): string | undefined {
@@ -279,29 +313,41 @@ export class AniCliService {
     return details;
   }
 
-  async resolveEpisode(id: string, episode: number): Promise<EpisodeResolution> {
+  async resolveEpisode(id: string, episode: number, preferredQuality?: string): Promise<EpisodeResolution> {
     const selection = decodeSelection(id);
     validateEpisode(episode);
-
-    const output = await this.enqueue(() =>
-      this.run(["-S", String(selection.index), "-e", String(episode), selection.query])
-    );
-    const title = parseMarker(output.stderr, "ANICLI_TITLE");
-    const streamUrl = parseMarker(output.stderr, "ANICLI_STREAM_URL");
-    const streamReferrer = parseMarker(output.stderr, "ANICLI_STREAM_REFERRER");
-    const subtitleUrl = parseMarker(output.stderr, "ANICLI_SUBTITLE_URL");
-
-    if (!title || !streamUrl || !isHttpUrl(streamUrl)) {
-      throw new AniCliError("ani-cli returned no browser-playable stream", { stderr: output.stderr });
+    if (preferredQuality !== undefined) {
+      validateQuality(preferredQuality);
     }
 
-    return {
-      title,
-      episode,
-      streamUrl,
-      ...(streamReferrer && isHttpUrl(streamReferrer) ? { streamReferrer } : {}),
-      ...(subtitleUrl && isHttpUrl(subtitleUrl) ? { subtitleUrl } : {})
-    };
+    const args = ["-S", String(selection.index), "-e", String(episode), selection.query];
+
+    return this.enqueue(async () => {
+      const listing = await this.run(args, { environment: { ANI_CLI_PLAYER: qualityListingPlayer } });
+      const qualities = parseQualityLinks(listing.stdout);
+      const quality = chooseQuality(qualities, preferredQuality);
+      const output = await this.run(args, {
+        environment: quality ? { ANI_CLI_QUALITY: quality } : {}
+      });
+      const title = parseMarker(output.stderr, "ANICLI_TITLE");
+      const streamUrl = parseMarker(output.stderr, "ANICLI_STREAM_URL");
+      const streamReferrer = parseMarker(output.stderr, "ANICLI_STREAM_REFERRER");
+      const subtitleUrl = parseMarker(output.stderr, "ANICLI_SUBTITLE_URL");
+
+      if (!title || !streamUrl || !isHttpUrl(streamUrl)) {
+        throw new AniCliError("ani-cli returned no browser-playable stream", { stderr: output.stderr });
+      }
+
+      return {
+        title,
+        episode,
+        streamUrl,
+        ...(streamReferrer && isHttpUrl(streamReferrer) ? { streamReferrer } : {}),
+        ...(subtitleUrl && isHttpUrl(subtitleUrl) ? { subtitleUrl } : {}),
+        ...(quality ? { quality } : {}),
+        qualities
+      };
+    });
   }
 
   private async run(args: string[], options: CommandOptions = {}): Promise<CommandOutput> {
@@ -440,6 +486,12 @@ function validateQuery(query: string): void {
 function validateEpisode(episode: number): void {
   if (!Number.isInteger(episode) || episode < 1 || episode > 10_000) {
     throw new AniCliInputError("Episode number is invalid");
+  }
+}
+
+function validateQuality(quality: string): void {
+  if (!qualityLabelPattern.test(quality)) {
+    throw new AniCliInputError("Quality is invalid");
   }
 }
 

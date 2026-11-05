@@ -9,7 +9,22 @@
   </head>
   <body>
     <main>
-      <h1>AniLAN</h1>
+      <header class="app-header">
+        <h1>AniLAN</h1>
+        <button id="settings-toggle" type="button" aria-controls="settings-panel" aria-expanded="false">Settings</button>
+      </header>
+      <section id="settings-panel" aria-labelledby="settings-heading" hidden>
+        <h2 id="settings-heading">Settings</h2>
+        <label for="preferred-quality">Preferred resolution</label>
+        <select id="preferred-quality">
+          <option value="">Highest available</option>
+          <option value="1080p">1080p</option>
+          <option value="720p">720p</option>
+          <option value="480p">480p</option>
+          <option value="360p">360p</option>
+        </select>
+        <p class="hint">Used when an episode is resolved. If it is not offered, the highest available resolution is used.</p>
+      </section>
       <form id="search-form" aria-busy="false">
         <label for="search-query">Search anime</label>
         <div class="search-row">
@@ -23,6 +38,14 @@
         <h2 id="player-heading">Now playing</h2>
         <p id="player-title"></p>
         <video id="video-player" controls playsinline preload="metadata"></video>
+        <div id="player-quality-control" class="control-row" hidden>
+          <label for="player-quality">Resolution</label>
+          <select id="player-quality"></select>
+        </div>
+        <nav id="episode-nav" class="episode-nav" aria-label="Episode navigation" hidden>
+          <button id="previous-episode" type="button">Previous episode</button>
+          <button id="next-episode" type="button">Next episode</button>
+        </nav>
         <p id="player-status" role="status" aria-live="polite"></p>
       </section>
       <section id="episodes-panel" aria-labelledby="episodes-heading" hidden>

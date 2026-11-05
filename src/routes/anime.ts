@@ -11,6 +11,10 @@ interface EpisodeParams extends AnimeParams {
   episode: string;
 }
 
+interface EpisodeQuery {
+  quality?: string;
+}
+
 export async function registerAnimeRoutes(
   app: FastifyInstance,
   aniCli: AniCliService,
@@ -62,7 +66,7 @@ export async function registerAnimeRoutes(
     }
   );
 
-  await app.get<{ Params: EpisodeParams }>(
+  await app.get<{ Params: EpisodeParams; Querystring: EpisodeQuery }>(
     "/api/anime/:id/episode/:episode",
     {
       schema: {
@@ -84,12 +88,26 @@ export async function registerAnimeRoutes(
           },
           required: ["id", "episode"],
           additionalProperties: false
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            quality: {
+              type: "string",
+              pattern: "^[1-9][0-9]{2,3}p$"
+            }
+          },
+          additionalProperties: false
         }
       }
     },
     async (request, reply) => {
       try {
-        const resolution = await aniCli.resolveEpisode(request.params.id, Number(request.params.episode));
+        const resolution = await aniCli.resolveEpisode(
+          request.params.id,
+          Number(request.params.episode),
+          request.query.quality
+        );
         const {
           streamUrl,
           streamReferrer: _streamReferrer,
